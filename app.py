@@ -5,7 +5,7 @@ from PIL import Image
 from pythainlp import word_tokenize
 
 # --- 1. ตั้งค่าหน้าจอและรูปภาพประกอบ ---
-st.set_page_config(page_title="ChatLert", layout="centered")
+st.set_page_config(page_title="ChatLert", page_icon="💬", layout="centered")
 
 # --- โค้ด CSS แก้ปัญหาข้อความ st.metric โดนตัด ---
 st.markdown("""
