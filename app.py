@@ -4,17 +4,59 @@ import os
 from PIL import Image
 from pythainlp import word_tokenize
 
-# --- 1. ตั้งค่าหน้าจอและรูปภาพประกอบ ---
-st.set_page_config(page_title="ChatLert", page_icon="💬", layout="centered")
+# --- 1. ตั้งค่าหน้าจอและรูปภาพประกอบ (เอาไอคอนออก) ---
+st.set_page_config(page_title="ChatLert", layout="centered")
 
-# --- โค้ด CSS แก้ปัญหาข้อความ st.metric โดนตัด ---
+# --- 🎨 โค้ด CSS Makeover ธีมสีม่วงอ่อน (Light Purple Theme) ---
 st.markdown("""
     <style>
+    /* เปลี่ยนสีพื้นหลังหลักของหน้าเว็บเป็นสีม่วงพาสเทลอ่อนๆ */
+    .stApp {
+        background-color: #fbf8ff;
+    }
+
+    /* ปรับสีของหัวข้อ (Header) ให้เป็นสีม่วงเข้ม */
+    h1, h2, h3 {
+        color: #6a1b9a !important;
+    }
+
+    /* ปรับแต่งกล่อง Metric (เจตนา, สกัดข้อมูล) ให้เป็นการ์ดดูพรีเมียม */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0px 4px 10px rgba(123, 31, 162, 0.08);
+        border-top: 4px solid #ba68c8;
+    }
+
+    /* ปรับสีและฟอนต์ของข้อความในกล่อง Metric */
+    div[data-testid="stMetricLabel"] p {
+        font-size: 15px !important;
+        font-weight: bold !important;
+        color: #8e24aa !important;
+    }
+    
     div[data-testid="stMetricValue"] > div {
         white-space: normal !important;
         word-wrap: break-word !important;
-        font-size: 20px !important;
+        font-size: 18px !important;
         line-height: 1.3 !important;
+        color: #4a148c !important;
+    }
+
+    /* ปรับปุ่มกดให้เป็นโทนม่วง */
+    .stButton>button {
+        background-color: #ab47bc !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: none !important;
+        box-shadow: 0px 4px 6px rgba(171, 71, 188, 0.3) !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton>button:hover {
+        background-color: #8e24aa !important;
+        box-shadow: 0px 6px 12px rgba(142, 36, 170, 0.4) !important;
+        transform: translateY(-2px);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -45,23 +87,17 @@ class ChatLertEngine:
         has_polite_suffix = any(s in raw_text for s in female_suffixes + male_suffixes)
         is_female = any(s in raw_text for s in female_suffixes)
 
-        # 5.1 การทำความสะอาดข้อความ
         step1 = re.sub(r'[^\u0E00-\u0E7Fa-zA-Z0-9\s]', '', raw_text)
-        
-        # 5.2 การลดตัวอักษรซ้ำ
         step2 = self.reduce_repeated(step1)
         
-        # เพิ่มคำว่า "ยาง" ในการดักจับประโยคคำถาม
         original_is_question = any(word in step2 for word in ["ไหม", "อะไร", "ไหน", "ยัง", "เมื่อไหร่", "กี่", "มั้ย", "มัย", "หนาย", "ไร", "บ้าง", "ยาง"])
 
-        # 5.3 การปรับคำแสลง
         step3 = step2
         correct_kha_step3 = "คะ" if original_is_question else "ค่ะ"
         for slang_kha in ["คระ", "ค่า", "คร่า"]:
             if slang_kha in step3:
                 step3 = step3.replace(slang_kha, correct_kha_step3)
                 
-        # 🚀 อัปเกรดพจนานุกรมคำแสลง ให้ครอบคลุมการลากเสียงสระ (เช่น ถึงยางงง)
         slang_replacements = [
             ("หนายย", "ไหน"), ("หนาย", "ไหน"),
             ("อยุ่", "อยู่"), ("อยุ", "อยู่"), ("ยุ", "อยู่"),
@@ -70,32 +106,27 @@ class ChatLertEngine:
             ("สนจัย", "สนใจ"),
             ("งับ", "ครับ"), ("ค้าบ", "ครับ"), ("คั้บ", "ครับ"), ("คาบ", "ครับ"), ("คับ", "ครับ"),
             ("ไร", "อะไร"),
-            ("ถึงยาง", "ถึงยัง"), ("ส่งยาง", "ส่งยัง"), ("ได้ยาง", "ได้ยัง") # ดักจับคำว่า ยาง -> ยัง
+            ("ถึงยาง", "ถึงยัง"), ("ส่งยาง", "ส่งยัง"), ("ได้ยาง", "ได้ยัง") 
         ]
         
         for slang, formal in slang_replacements:
             step3 = step3.replace(slang, formal)
             
-        # เคลียร์ปัญหาการแทนที่ทับซ้อน
         step3 = step3.replace("ออะไร", "อะไร")
         step3 = step3.replace("ออยู่", "อยู่")
 
         text_for_tokenize = step3.replace("ไหนคะ", "ไหน คะ").replace("ไหมคะ", "ไหม คะ")
             
-        # 5.4 การตัดคำภาษาไทย
         raw_tokens = word_tokenize(text_for_tokenize, engine="newmm")
         
-        # 5.5 การลบ Token ที่ไม่จำเป็น
         step5_tokens = [t.strip() for t in raw_tokens if t not in self.junk_tokens and t.strip() != ""]
         step5_text = "".join(step5_tokens)
 
-        # 5.8 การจำแนกเจตนา & 5.6 การปรับโครงสร้างประโยค
-        intent = "💬 ข้อความทั่วไป"
+        intent = "ข้อความทั่วไป"
         adjusted = step5_text
 
-        # 🚀 อัปเกรดกลุ่ม Keyword ของเจตนาให้ครอบคลุมมากขึ้น
         if any(word in step5_text for word in ["ส่ง", "ถึงไหน", "ได้ของ", "พัสดุ", "วันไหน", "ถึงยัง", "ส่งยัง"]):
-            intent = "📦 สอบถามสถานะสินค้า"
+            intent = "สอบถามสถานะสินค้า"
             if "วัน" in step5_text:
                 adjusted = "สินค้าจะจัดส่งถึงในวันไหน"
             elif "ถึงไหน" in step5_text:
@@ -106,21 +137,21 @@ class ChatLertEngine:
                 adjusted = "สินค้าจัดส่งแล้วหรือยัง"
                 
         elif any(word in step5_text for word in ["โอน", "จ่าย", "ยอด", "สลิป"]):
-            intent = "💰 แจ้งชำระเงิน"
+            intent = "แจ้งชำระเงิน"
             if "เช็ค" in step5_text or "ตรวจสอบ" in step5_text:
                 adjusted = "โอนเงินเรียบร้อยแล้ว ตรวจสอบให้ด้วย"
             else:
                 adjusted = "โอนเงินเรียบร้อยแล้ว"
                 
         elif "เปลี่ยน" in step5_text or "เคลม" in step5_text:
-            intent = "🔁 ขอเปลี่ยนสินค้า"
+            intent = "ขอเปลี่ยนสินค้า"
             if any(word in step5_text for word in ["ไซส์", "เล็ก", "ใหญ่", "ขนาด"]):
                 adjusted = "ต้องการขอเปลี่ยนไซส์สินค้า"
             else:
                 adjusted = "ต้องการขอเปลี่ยนสินค้า"
                 
         elif any(word in step5_text for word in ["สนใจ", "ราคา", "สี", "ขนาด", "ไซส์", "เท่าไหร่", "กี่บาท"]):
-            intent = "🎨 สอบถามรายละเอียดสินค้า"
+            intent = "สอบถามรายละเอียดสินค้า"
             adjusted = step5_text
 
         info_product = "-"
@@ -132,7 +163,6 @@ class ChatLertEngine:
         elif "ไซส์" in step5_text or "ขนาด" in step5_text: info_attr = "ไซส์ (Size)"
         elif "ราคา" in step5_text or "เท่าไหร่" in step5_text: info_attr = "ราคา (Price)"
 
-        # 5.7 การเพิ่มคำสุภาพ
         if has_polite_suffix:
             final_is_question = any(word in adjusted for word in ["ไหน", "ยัง", "ไหม", "อะไร", "เท่าไหร่", "กี่", "บ้าง"])
             if is_female:
@@ -166,13 +196,13 @@ def main():
     with col_l:
         if img_logo: st.image(img_logo, width=80)
     with col_r:
-        st.title("ChatLert")
+        st.title("ChatLert NLP System")
         st.write("ระบบแปลงภาษาแชทลูกค้าเป็นภาษาไทยมาตรฐาน (Official Application)")
         st.caption("ผู้จัดทำ: นางสาวสิมิลันนา พาล์เมียรี่ ชไวเกิร์ต")
     
     st.divider()
 
-    with st.expander("💡 ข้อความตัวอย่าง (คลิกเพื่อคัดลอก)"):
+    with st.expander("ข้อความตัวอย่าง (คลิกเพื่อคัดลอก)"):
         example_texts = """สินค้าถึงวันหนายยยค่าา\nโอนแล้วน้าา เช็คให้ทีงับ\nเสื้อตัวนี้ไซส์เล็กไป ขอเปลี่ยนหน่อยคระ\nสินค้าถึงยางงง\nสนจัยตัวนี้อยุ่ มีสีไรบ้างคะะะ"""
         st.code(example_texts, language="text")
 
@@ -184,19 +214,31 @@ def main():
         else:
             res = msg["content"]
             with st.chat_message("assistant", avatar=img_bot):
-                st.success(f"**ภาษามาตรฐาน:** {res['step_5_7']}")
+                
+                custom_success_box = f"""
+                <div style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); 
+                            border-left: 5px solid #ab47bc; 
+                            border-radius: 10px; 
+                            padding: 15px; 
+                            margin-bottom: 15px;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <span style="font-size: 14px; color: #6a1b9a;"><b>ภาษามาตรฐาน:</b></span><br>
+                    <span style="font-size: 20px; color: #4a148c; font-weight: bold;">{res['step_5_7']}</span>
+                </div>
+                """
+                st.markdown(custom_success_box, unsafe_allow_html=True)
                 
                 col_m1, col_m2, col_m3 = st.columns([1.2, 1, 1])
                 with col_m1:
-                    st.metric("🎯 เจตนา (Intent)", res["step_5_8"])
+                    st.metric("เจตนา (Intent)", res["step_5_8"])
                 with col_m2:
                     extracted_info = f"{res['product']} | {res['attr']}" if res['product'] != "-" or res['attr'] != "-" else "ไม่พบข้อมูลเฉพาะ"
-                    st.metric("📦 การสกัดข้อมูล", extracted_info)
+                    st.metric("การสกัดข้อมูล", extracted_info)
                 with col_m3:
                     suffix_status = "ปรับตามหางเสียง" if res["has_suffix"] else "ไม่ใช้หางเสียง"
-                    st.metric("✨ รูปแบบประโยค", suffix_status)
+                    st.metric("รูปแบบประโยค", suffix_status)
 
-                with st.expander("🛠 ดูรายละเอียด NLP Pipeline 8 ขั้นตอน (Technical Details)"):
+                with st.expander("ดูรายละเอียด NLP Pipeline 8 ขั้นตอน (Technical Details)"):
                     st.write(f"**1. การทำความสะอาด (Clean):** `{res['step_5_1']}`")
                     st.write(f"**2. การลดตัวอักษรซ้ำ (Reduced):** `{res['step_5_2']}`")
                     st.write(f"**3. การปรับคำแสลง (Slang Normalization):** `{res['step_5_3']}`")
@@ -216,19 +258,31 @@ def main():
         res = engine.process(prompt)
 
         with st.chat_message("assistant", avatar=img_bot):
-            st.success(f"**ภาษามาตรฐาน:** {res['step_5_7']}")
+            
+            custom_success_box = f"""
+            <div style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); 
+                        border-left: 5px solid #ab47bc; 
+                        border-radius: 10px; 
+                        padding: 15px; 
+                        margin-bottom: 15px;
+                        box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <span style="font-size: 14px; color: #6a1b9a;"><b>ภาษามาตรฐาน:</b></span><br>
+                <span style="font-size: 20px; color: #4a148c; font-weight: bold;">{res['step_5_7']}</span>
+            </div>
+            """
+            st.markdown(custom_success_box, unsafe_allow_html=True)
             
             col_m1, col_m2, col_m3 = st.columns([1.2, 1, 1])
             with col_m1:
-                st.metric("🎯 เจตนา (Intent)", res["step_5_8"])
+                st.metric("เจตนา (Intent)", res["step_5_8"])
             with col_m2:
                 extracted_info = f"{res['product']} | {res['attr']}" if res['product'] != "-" or res['attr'] != "-" else "ไม่พบข้อมูลเฉพาะ"
-                st.metric("📦 การสกัดข้อมูล", extracted_info)
+                st.metric("การสกัดข้อมูล", extracted_info)
             with col_m3:
                 suffix_status = "ปรับตามหางเสียง" if res["has_suffix"] else "ไม่ใช้หางเสียง"
-                st.metric("✨ รูปแบบประโยค", suffix_status)
+                st.metric("รูปแบบประโยค", suffix_status)
 
-            with st.expander("🛠 ดูรายละเอียด NLP Pipeline 8 ขั้นตอน (Technical Details)"):
+            with st.expander("ดูรายละเอียด NLP Pipeline 8 ขั้นตอน (Technical Details)"):
                 st.write(f"**1. การทำความสะอาด (Clean):** `{res['step_5_1']}`")
                 st.write(f"**2. การลดตัวอักษรซ้ำ (Reduced):** `{res['step_5_2']}`")
                 st.write(f"**3. การปรับคำแสลง (Slang Normalization):** `{res['step_5_3']}`")
